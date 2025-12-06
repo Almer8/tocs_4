@@ -63,7 +63,7 @@ public class Main {
 
         int iterations = 10;
         Random random = new Random();
-        for (int iter = 1; iter < iterations; iter++){
+        for (int iter = 0; iter < iterations; iter++){
 
             BinarySearchTree bst = new BinarySearchTree();
             wst = new WAVLSearchTree();
@@ -91,6 +91,8 @@ public class Main {
                 bstKeys.add(randomInt);
                 wstKeys.add(randomInt);
             }
+
+
             total_bst_height += bst.height(bst.root);
             total_wavl_height += wst.height(wst.root);
 
@@ -151,6 +153,9 @@ public class Main {
                         }
                 }
             }
+
+            wst.checkBalance(wst.root);
+
             total_bst_search_nodes += bst_search_nodes_checked.get();
             total_bst_insert_nodes += bst_insert_nodes_checked.get();
             total_bst_delete_nodes += bst_delete_nodes_checked.get();
@@ -163,6 +168,8 @@ public class Main {
 
         }
 
+        System.out.println();
+        System.out.printf("Average BST height: %s\n", total_bst_height / iterations);
         System.out.printf("Average BST search nodes checked: %.3f\n",
                 (double)total_bst_search_nodes / total_bst_search);
         System.out.printf("Average BST insert nodes checked: %.3f\n",
@@ -170,6 +177,7 @@ public class Main {
         System.out.printf("Average BST delete nodes checked: %.3f\n",
                 (double)total_bst_delete_nodes / total_bst_delete);
 
+        System.out.printf("Average WAVL height: %s\n", total_wavl_height / iterations);
         System.out.printf("Average WAVL search nodes checked: %.3f\n",
                 (double)total_wst_search_nodes / total_wst_search);
         System.out.printf("Average WAVL insert nodes checked: %.3f\n",
@@ -180,8 +188,6 @@ public class Main {
                 (double)total_wst_delete_nodes / total_wst_delete);
         System.out.printf("Average WAVL delete rotates: %.3f\n",
                 (double)total_wst_delete_rotates / total_wst_delete);
-
-
 
 
     }

@@ -12,8 +12,24 @@ public class WAVLSearchTree {
         NIL.left = NIL;
         NIL.right = NIL;
         NIL.parent = NIL;
+        root = NIL;
     }
 
+    private int rank(Node n) {
+        return (n == NIL) ? 0 : n.rank;
+    }
+
+    private void demote(Node n) {
+        if (n != NIL) {
+            n.rank--;
+        }
+    }
+
+    private void promote(Node n) {
+        if (n != NIL) {
+            n.rank++;
+        }
+    }
 
     public Node treeSearch(Node node, Integer key, AtomicInteger checked) {
         while (node != NIL && !key.equals(node.key)) {
@@ -24,19 +40,19 @@ public class WAVLSearchTree {
     }
 
     public Node minimum(Node node) {
-        if (node == null || node == NIL) return NIL;
+        if (node == NIL) return NIL;
         while (node.left != NIL) node = node.left;
         return node;
     }
 
     public Node maximum(Node node) {
-        if (node == null || node == NIL) return NIL;
+        if (node == NIL) return NIL;
         while (node.right != NIL) node = node.right;
         return node;
     }
 
     public Node successor(Node node) {
-        if (node == null || node == NIL) return NIL;
+        if (node == NIL) return NIL;
         if (node.right != NIL) return minimum(node.right);
         for (Node n = node.parent; n != NIL; n = n.parent) {
             if (n.left == node) return n;
@@ -46,7 +62,7 @@ public class WAVLSearchTree {
     }
 
     public Node predecessor(Node node) {
-        if (node == null || node == NIL) return NIL;
+        if (node == NIL) return NIL;
         if (node.left != NIL) return maximum(node.left);
         for (Node n = node.parent; n != NIL; n = n.parent) {
             if (n.right == node) return n;
@@ -121,17 +137,15 @@ public class WAVLSearchTree {
                     leftRotate(root, p);
                 }
 
+                demote(p);
                 if (doubleRotation) {
-                    p.rank--;
-                    x.rank--;
+                    demote(x);
                     Node newRoot = (p.parent == NIL ? root : p.parent);
-                    newRoot.rank++;
-                } else {
-                    p.rank--;
+                    promote(newRoot);
                 }
                 return;
             } else {
-                p.rank++;
+                promote(p);
             }
         }
 
@@ -140,152 +154,145 @@ public class WAVLSearchTree {
 
     public Node insert(Integer key, AtomicInteger wst_insert_nodes_checked, AtomicInteger wst_insert_rotates) {
         Node n = new Node(null, NIL, NIL, key, 1);
-        n.left.parent = n;
-        n.right.parent = n;
-
-        if (root == null) {
-            n.parent = NIL;
-            root = n;
-            return n;
-        }
 
         Node x = root;
-        Node y = null;
+        Node y = NIL;
+
         while (x != NIL) {
             wst_insert_nodes_checked.incrementAndGet();
             y = x;
             x = (key < x.key) ? x.left : x.right;
         }
+
         n.parent = y;
-        if(key < y.key) {
+
+        if (y == NIL) {
+            root = n;
+        } else if (key < y.key) {
             y.left = n;
-        } else{
+        } else {
             y.right = n;
         }
         insertFixup(n, wst_insert_rotates);
         return n;
     }
 
-    public void deleteFixup(Node n, AtomicInteger wst_delete_rotates) {
-        for (Node x = n; x.parent != NIL; x = x.parent) {
-            Node p = x.parent;
-            int diffPX = p.rank - x.rank;
-
-            if (diffPX == 2) return;
+    private void deleteFixup(Node x, Node p, AtomicInteger wst_delete_rotates) {
+        while (p != NIL) {
+            int diff = rank(p) - rank(x);
 
             Node b = (x == p.left) ? p.right : p.left;
-            int diffPB = p.rank - b.rank;
+            int diffPB = rank(p) - rank(b);
 
-            if (diffPB == 2) {
-                p.rank--;
-                x = p;
-            } else {
-                int diffBL = b.rank - b.left.rank;
-                int diffBR = b.rank - b.right.rank;
+            if (diff == 2) {
+                boolean isLeafViolation = diffPB == 2 && rank(p) == 2;
 
-                if (diffBL == 2 && diffBR == 2) {
-                    p.rank--;
-                    b.rank--;
-                    x = p;
-                } else {
-                    boolean doubleRotation = false;
-                    if (x == p.left) {
-                        if (diffBR == 1) {
-                            leftRotate(root, b);
-                            doubleRotation = true;
-                        }
-                        wst_delete_rotates.incrementAndGet();
-                        rightRotate(root, p);
-                    } else {
-                        if (diffBL == 1) {
-                            rightRotate(root, b);
-                            doubleRotation = true;
-                        }
-                        wst_delete_rotates.incrementAndGet();
-                        leftRotate(root, p);
-                    }
+                boolean isSiblingBroken = (diffPB > 2);
 
-                    if (doubleRotation) {
-                        wst_delete_rotates.incrementAndGet();
-                        p.rank--;
-                        b.rank--;
-                        x.rank++;
-                    } else {
-                        p.rank--;
-                    }
-
+                if (!isLeafViolation && !isSiblingBroken) {
                     return;
                 }
             }
+
+            if (diffPB == 2) {
+                demote(p);
+                x = p;
+                p = p.parent;
+                continue;
+            }
+
+            int diffBL = rank(b) - rank(b.left);
+            int diffBR = rank(b) - rank(b.right);
+
+            if (diffBL == 2 && diffBR == 2) {
+                demote(p);
+                demote(b);
+                x = p;
+                p = p.parent;
+                continue;
+            }
+
+            if (x == p.left) {
+                wst_delete_rotates.incrementAndGet();
+                if (diffBR == 1) {
+                    leftRotate(root, p);
+
+                    if (p.left == NIL && p.right == NIL) p.rank = 1;
+                    else demote(p);
+
+                    promote(b);
+                } else {
+                    rightRotate(root, b);
+                    wst_delete_rotates.incrementAndGet();
+                    leftRotate(root, p);
+
+                    Node newRoot = p.parent;
+                    promote(newRoot);
+                    promote(newRoot);
+                    demote(p);
+                    demote(p);
+                    demote(b);
+                }
+            } else {
+                wst_delete_rotates.incrementAndGet();
+                if (diffBL == 1) {
+                    rightRotate(root, p);
+
+                    if (p.left == NIL && p.right == NIL) p.rank = 1;
+                    else demote(p);
+
+                    promote(b);
+                } else {
+                    leftRotate(root, b);
+                    wst_delete_rotates.incrementAndGet();
+                    rightRotate(root, p);
+
+                    Node newRoot = p.parent;
+                    promote(newRoot);
+                    promote(newRoot);
+                    demote(p);
+                    demote(p);
+                    demote(b);
+                }
+            }
+            return;
         }
     }
 
 
 
-    public void delete(Node node, AtomicInteger wst_delete_nodes_checked, AtomicInteger wst_delete_rotates) {
-        if (node == null || node == NIL) return;
+    public void delete(Node node, AtomicInteger checks, AtomicInteger rotates) {
+        if (node == NIL) return;
 
         if (node.left != NIL && node.right != NIL) {
-            Node y;
-            if(maximum(root).equals(node)) {
-                y = predecessor(node);
-            } else if(minimum(root).equals(node)) {
-                y = successor(node);
-            }
-            else {
-                if(new Random().nextBoolean()) {
-                    y = predecessor(node);
-                } else {
-                    y = successor(node);
-                }
-            }
-
-            node.key = y.key;
-            wst_delete_nodes_checked.incrementAndGet();
-            delete(y, wst_delete_nodes_checked, wst_delete_rotates);
+            Node deleteNode = new Random().nextBoolean() ? successor(node): predecessor(node);
+            node.key = deleteNode.key;
+            checks.incrementAndGet();
+            delete(deleteNode, checks, rotates);
             return;
         }
-
-
-        Node parent = node.parent;
         Node child = (node.left != NIL) ? node.left : node.right;
-
-
-        if (parent == NIL) {
-            root = child;
-            if (child != NIL) {
-                child.parent = NIL;
-            }
-            return;
-        }
-
-        if (node == parent.left) {
-            parent.left = child;
-        } else {
-            parent.right = child;
-        }
+        Node parent = node.parent;
 
         if (child != NIL) {
             child.parent = parent;
         }
 
-        int diffL = parent.rank - parent.left.rank;
-        int diffR = parent.rank - parent.right.rank;
-
-        if (node.left == NIL && node.right == NIL) {
-            if (diffL == 2 && diffR == 2) {
-                parent.rank--;
-                deleteFixup(parent, wst_delete_rotates);
-            }
-
+        if (parent == NIL) {
+            root = child;
+            return;
         } else {
-
-            if (diffL == 2 && diffR == 2) {
-                parent.rank--;
-                deleteFixup(parent, wst_delete_rotates);
-            } else if (diffL == 3 || diffR == 3) {
-                deleteFixup(child, wst_delete_rotates);
+            if (node == parent.left) {
+                parent.left = child;
+            } else {
+                parent.right = child;
             }
+        }
+
+        int diff = rank(parent) - rank(child);
+
+        if (node.rank == 1 || diff == 3) {
+            deleteFixup(child, parent, rotates);
         }
     }
 
@@ -297,19 +304,9 @@ public class WAVLSearchTree {
     }
 
     public int height(Node node) {
-        return height(node, new HashSet<>());
-    }
-
-    private int height(Node node, Set<Node> visited) {
-        if (node == null || node == NIL) return 0;
-        if (visited.contains(node)) {
-            System.err.println("Cycle detected at " + node.key);
-            throw new RuntimeException("Cycle detected at " + node.key);
-           // return 0;
-        }
-        visited.add(node);
-        int left = height(node.left, visited);
-        int right = height(node.right, visited);
+        if (node == NIL) return 0;
+        int left = height(node.left);
+        int right = height(node.right);
         return Math.max(left, right) + 1;
     }
 
@@ -390,6 +387,18 @@ public class WAVLSearchTree {
     private int maxDepth(Node node) {
         if (node == NIL) return 0;
         return Math.max(maxDepth(node.left), maxDepth(node.right)) + 1;
+    }
+
+    public void checkBalance(Node node){
+        if(node == NIL) return;
+        checkBalance(node.left);
+        checkBalance(node.right);
+        if(node.rank - node.left.rank > 2 || node.rank - node.left.rank == 0){
+            System.out.println("Balance diff is " + (node.rank - node.left.rank));
+        }
+        if(node.rank - node.right.rank > 2 || node.rank - node.right.rank == 0){
+            System.out.println("Balance diff is " + (node.rank - node.right.rank));
+        }
     }
 
 
